@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
-import { CheckCircle2, Cloud, Loader2, PenTool, Type, FileText, LayoutTemplate, CornerDownRight, Download, ChevronDown, FolderOpen, Plus, X, Trash2, FileEdit, Upload, LogOut, User as UserIcon, FolderPlus, ArrowDownCircle, ChevronLeft, Folder, CheckSquare, Share2, Copy, MoveRight, Sun, Moon, Move, Home as HomeIcon, UserCog, Clock, CalendarPlus, ListOrdered } from 'lucide-react';
+import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { CheckCircle2, Cloud, Loader2, PenTool, Type, FileText, LayoutTemplate, CornerDownRight, Download, ChevronDown, ChevronRight, FolderOpen, Plus, X, Trash2, FileEdit, Upload, LogOut, User as UserIcon, FolderPlus, ArrowDownCircle, ChevronLeft, Folder, CheckSquare, Share2, Copy, MoveRight, Sun, Moon, Move, Home as HomeIcon, UserCog, Clock, CalendarPlus, ListOrdered } from 'lucide-react';
 
 // --- FIREBASE INITIALIZATION ---
 let firebaseConfig = {
-  apiKey: "AIzaSyCmFz7pYYY1XNShFCNusV-cgQXyXaX8Qm4", 
+  apiKey: "AIzaSyCmFz7pYvY1XNShFCNusV-cgQXyXaX8Qm4", 
   authDomain: "naskah-pro.firebaseapp.com",
   projectId: "naskah-pro",
   storageBucket: "naskah-pro.firebasestorage.app",
@@ -25,7 +25,7 @@ const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 const appId = (typeof __app_id !== 'undefined' ? __app_id : 'naskah-app-default').replace(/\//g, '-');
 
-// --- DAFTAR IKON CERDAS (SOLID VECTOR, ANIMASI, STATIS, EMOJI) ---
+// --- DAFTAR IKON CERDAS ---
 const SOLID_ICONS_MAP = {
   "solid:Folder": (props) => <svg viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>,
   "solid:Book": (props) => <svg viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg>,
@@ -50,7 +50,7 @@ const FOLDER_SOLID = ["solid:Folder", "solid:Book", "solid:File", "solid:Archive
 const PROFILE_SOLID = ["solid:User", "solid:Smile", "solid:Star", "solid:Heart", "solid:Zap", "solid:Bell", "solid:Camera", "solid:Archive"];
 
 const PROFILE_ICONS_3D = [
-  "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Cold%20face/3D/cold_face_3d.png", // Wajah Biru (Default)
+  "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Cold%20face/3D/cold_face_3d.png", 
   "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Smiling%20face%20with%20sunglasses/3D/smiling_face_with_sunglasses_3d.png",
   "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Nerd%20face/3D/nerd_face_3d.png",
   "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Partying%20face/3D/partying_face_3d.png",
@@ -111,7 +111,6 @@ const SafeIcon = ({ iconStr, className = "" }) => {
 
   const sizeClass = className.includes('w-') || className.includes('h-') || className.includes('text-') ? '' : 'w-full h-full';
 
-  // Render SVG Solid Kustom
   if (safeStr.startsWith('solid:')) {
     const SolidComp = SOLID_ICONS_MAP[safeStr] || SOLID_ICONS_MAP["solid:Folder"];
     return <SolidComp className={`${sizeClass} ${className}`.trim()} />;
@@ -223,7 +222,7 @@ const parseFDX = (xmlString) => {
 };
 
 // --- KOMPONEN AUTORESIZE TEXTAREA ---
-const AutoResizeTextarea = React.forwardRef(({ value, onChange, onKeyDown, onFocus, onSelect, className, placeholder }, ref) => {
+const AutoResizeTextarea = React.forwardRef(({ value, onChange, onKeyDown, onFocus, onSelect, className, style, placeholder }, ref) => {
   const internalRef = useRef(null);
 
   const setRefs = useCallback((node) => {
@@ -231,6 +230,8 @@ const AutoResizeTextarea = React.forwardRef(({ value, onChange, onKeyDown, onFoc
     if (typeof ref === 'function') ref(node);
     else if (ref) ref.current = node;
   }, [ref]);
+
+  const styleString = JSON.stringify(style || {});
 
   const adjustHeight = useCallback(() => {
     if (internalRef.current) {
@@ -250,7 +251,7 @@ const AutoResizeTextarea = React.forwardRef(({ value, onChange, onKeyDown, onFoc
 
   useLayoutEffect(() => {
     adjustHeight();
-  }, [value, className, adjustHeight]);
+  }, [value, className, styleString, adjustHeight]);
 
   useEffect(() => {
     adjustHeight();
@@ -291,10 +292,89 @@ const AutoResizeTextarea = React.forwardRef(({ value, onChange, onKeyDown, onFoc
       placeholder={placeholder}
       rows={1}
       spellCheck={false}
-      style={{ minHeight: '1.5em' }}
+      style={{ ...style, minHeight: '1.5em' }}
     />
   );
 });
+
+// --- KOMPONEN BANTUAN UI ---
+const FontSelector = ({ selected, onSelect, title, isDark }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const fonts = [
+    { id: 'default', label: 'Default (Mono)', class: 'font-mono' },
+    { id: 'fanwood', label: 'Fanwood Text', class: 'font-fanwood' },
+    { id: 'roboto', label: 'Roboto', class: 'font-roboto' }
+  ];
+
+  const currentFontLabel = fonts.find(f => f.id === selected)?.label || 'Default';
+
+  return (
+    <div className="mb-4">
+      <button 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`}
+      >
+        <span className={`text-[11px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/50' : 'text-gray-500'}`}>{title}</span>
+        <div className="flex items-center space-x-2">
+          <span className={`text-xs font-semibold ${isDark ? 'text-[#0A84FF]' : 'text-blue-500'}`}>{currentFontLabel}</span>
+          {isExpanded ? <ChevronDown size={14} className={isDark ? 'text-white/50' : 'text-gray-500'} /> : <ChevronRight size={14} className={isDark ? 'text-white/50' : 'text-gray-500'} />}
+        </div>
+      </button>
+
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-48 mt-2 opacity-100' : 'max-h-0 opacity-0'}`}>
+        <div className={`flex flex-col space-y-1 p-1 rounded-xl ${isDark ? 'bg-black/20' : 'bg-white shadow-sm border border-gray-100'}`}>
+          {fonts.map(font => (
+            <button 
+              key={font.id} 
+              onClick={() => { onSelect(font.id); setIsExpanded(false); }} 
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs rounded-lg transition-colors ${font.class}
+                ${selected === font.id ? (isDark ? 'bg-[#0A84FF]/20 text-[#0A84FF]' : 'bg-blue-50 text-[#0A84FF]') : (isDark ? 'text-white/80 hover:bg-white/10' : 'text-gray-700 hover:bg-gray-50')}
+              `}
+            >
+              <span>{font.label}</span>
+              {selected === font.id && <CheckCircle2 size={14} className="text-[#0A84FF]" />}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SliderControl = ({ label, value, min, max, step, onChange, suffix = "" }) => {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const stopPropagation = (e) => e.stopPropagation();
+    el.addEventListener('touchstart', stopPropagation, { passive: false });
+    el.addEventListener('touchmove', stopPropagation, { passive: false });
+    return () => {
+      el.removeEventListener('touchstart', stopPropagation);
+      el.removeEventListener('touchmove', stopPropagation);
+    };
+  }, []);
+
+  return (
+    <div className="mb-4 last:mb-1 relative z-50">
+      <div className="flex justify-between text-[10px] mb-2 opacity-80 font-medium uppercase tracking-wider">
+        <span>{label}</span>
+        <span>{value}{suffix}</span>
+      </div>
+      <div className="py-2">
+        <input 
+          ref={inputRef}
+          type="range" min={min} max={max} step={step || 1} value={value} 
+          onChange={(e) => onChange(Number(e.target.value))} 
+          onInput={(e) => onChange(Number(e.target.value))} 
+          onMouseDown={(e) => e.stopPropagation()} 
+          className="w-full accent-[#0A84FF] h-1.5 bg-gray-200 dark:bg-white/20 rounded-lg cursor-pointer appearance-none outline-none block touch-none" 
+        />
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -366,14 +446,22 @@ export default function App() {
   const [isFooterHidden, setIsFooterHidden] = useState(false);
 
   // --- STATE FONT BARU ---
+  const [settingsTab, setSettingsTab] = useState('umum');
   const [selectedFont, setSelectedFont] = useState('default');
+  const [titleFont, setTitleFont] = useState('roboto');
+  
+  const [titleFontSize, setTitleFontSize] = useState(64);
+  const [titleFontWeight, setTitleFontWeight] = useState(400);
+  const [titlePaddingTop, setTitlePaddingTop] = useState(48); 
+  const [titlePaddingBottom, setTitlePaddingBottom] = useState(48); 
+  const [titleLineHeight, setTitleLineHeight] = useState(1.1);
   const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
 
   // --- DRAG AND DROP STATE ---
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverTarget, setDragOverTarget] = useState(null);
   const [touchDragState, setTouchDragState] = useState({ isDragging: false, x: 0, y: 0, item: null });
-  const dragNavTimeout = useRef(null); // Timeout untuk fitur hover back/navigasi
+  const dragNavTimeout = useRef(null); 
   const touchTimerRef = useRef(null);
 
   // Custom Alert & Toast System
@@ -382,6 +470,13 @@ export default function App() {
 
   const blockRefs = useRef({});
   const fileInputRef = useRef(null);
+
+  // Ref untuk Force Save on Exit
+  const latestBlocksRef = useRef(blocks);
+  const latestTitleRef = useRef(scriptTitle);
+
+  useEffect(() => { latestBlocksRef.current = blocks; }, [blocks]);
+  useEffect(() => { latestTitleRef.current = scriptTitle; }, [scriptTitle]);
 
   const isFolderSelected = selectedItems.some(id => folders.some(f => f.id === id));
 
@@ -607,56 +702,54 @@ export default function App() {
     });
   };
 
-  // --- 2. LOAD PREFERENCES ---
-  const loadData = useCallback(async () => {
-    if (!user || !db) return;
-    setIsLoaded(false); 
-    try {
-      const foldersRef = collection(db, 'artifacts', appId, 'users', user.uid, 'folders');
-      const scriptsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'scripts');
-      
-      const [fSnap, sSnap] = await Promise.all([getDocs(foldersRef), getDocs(scriptsRef)]);
-      
-      let loadedFolders = fSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      let loadedScripts = sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // Bersihkan naskah "hantu" yang tertinggal dari folder yang dihapus di versi lama
-      const validFolderIds = new Set(loadedFolders.map(f => f.id));
-      const validScripts = [];
-      loadedScripts.forEach(s => {
-        if (s.folderId && !validFolderIds.has(s.folderId)) {
-          deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'scripts', s.id)).catch(() => {});
-        } else {
-          validScripts.push(s);
-        }
-      });
-      
-      setFolders(loadedFolders);
-      setScriptsList(validScripts);
+  // --- 2. LOAD DATA DENGAN REAL-TIME ONSNAPSHOT ---
+  useEffect(() => {
+    if (!user || !db) {
+      if (!user && !authLoading) setIsLoaded(true);
+      return;
+    }
+    
+    setIsLoaded(false);
 
-      // Load Profile Data
-      const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'preferences', 'app_settings');
-      const prefSnap = await getDoc(prefRef);
+    // Listener Real-time Folder
+    const unsubFolders = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'folders'), (snap) => {
+      const loadedFolders = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setFolders(loadedFolders);
+    }, (err) => console.error("Error folders:", err));
+
+    // Listener Real-time Scripts
+    const unsubScripts = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'scripts'), (snap) => {
+      const loadedScripts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Filter out scripts with non-existent folders
+      const validFolderIds = new Set(folders.map(f => f.id));
+      const validScripts = loadedScripts.filter(s => !s.folderId || validFolderIds.has(s.folderId));
+      
+      setScriptsList(validScripts);
+      setIsLoaded(true);
+    }, (err) => {
+      console.error("Error scripts:", err);
+      setIsLoaded(true);
+    });
+
+    // Load Profile (sekali saja)
+    getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'preferences', 'app_settings')).then(prefSnap => {
       if (prefSnap.exists()) {
         const pd = prefSnap.data();
         if (pd.profileName) setProfileName(pd.profileName);
         if (pd.profileIcon) {
           let loadedIcon = pd.profileIcon;
-          if (typeof loadedIcon === 'object') {
-             loadedIcon = loadedIcon.anim || loadedIcon.static || loadedIcon.native || PROFILE_ICONS_3D[0];
-          }
+          if (typeof loadedIcon === 'object') loadedIcon = loadedIcon.anim || loadedIcon.static || loadedIcon.native || PROFILE_ICONS_3D[0];
           setProfileIcon(loadedIcon);
         }
       }
+    });
 
-    } catch (err) { 
-      console.error("Gagal load data:", err); 
-    } finally {
-      setIsLoaded(true); 
-    }
-  }, [user]);
-
-  useEffect(() => { loadData(); }, [loadData]);
+    return () => {
+      unsubFolders();
+      unsubScripts();
+    };
+  }, [user, db, folders.length]); // folder length dependency for orphan script filter
 
   // --- PROFILE UPDATE ---
   const handleSaveProfile = async () => {
@@ -702,7 +795,6 @@ export default function App() {
     if (!newFolderName || newFolderName.trim() === "") return;
     const newId = `folder_${Date.now()}`;
     const newFolder = { id: newId, name: newFolderName.trim(), icon: "solid:Folder", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    setFolders(prev => [newFolder, ...prev]);
     setIsNewFolderModalOpen(false);
     showToast("Folder berhasil dibuat!");
     try { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'folders', newId), newFolder); } catch (err) {}
@@ -715,7 +807,6 @@ export default function App() {
     let updatedName = newName && newName.trim() !== "" ? newName.trim() : folder.name;
     let updatedIcon = newIcon !== undefined ? newIcon : folder.icon;
 
-    setFolders(prev => prev.map(f => f.id === id ? { ...f, name: updatedName, icon: updatedIcon, updatedAt: new Date().toISOString() } : f));
     setEditingFolderName(updatedName);
     setEditingFolderIcon(updatedIcon);
     try { 
@@ -732,6 +823,21 @@ export default function App() {
       setEditingFolderIcon(folder.icon || ""); 
     }
     goToView('folder');
+  };
+
+  // --- FORCE SAVE ON EXIT ---
+  const forceSaveScript = async () => {
+    if (!user || !currentScriptId || !db || latestBlocksRef.current.length === 0) return;
+    const isoDate = new Date().toISOString();
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'scripts', currentScriptId), { 
+        id: currentScriptId, 
+        title: latestTitleRef.current, 
+        blocks: latestBlocksRef.current, 
+        updatedAt: isoDate,
+        titleFont, titleFontSize, titleFontWeight, titlePaddingTop, titlePaddingBottom, titleLineHeight
+      }, { merge: true });
+    } catch (err) { console.error("Force save failed", err); }
   };
 
   // --- SCRIPT ACTIONS ---
@@ -763,6 +869,14 @@ export default function App() {
         setBlocks(sanitizedBlocks); 
         setScriptTitle(data.title || "Naskah Tanpa Judul");
         setCurrentScriptId(scriptId); setLastSaved(new Date(data.updatedAt));
+        
+        // Memuat pengaturan gaya judul unik untuk naskah ini
+        setTitleFont(data.titleFont || 'roboto');
+        setTitleFontSize(data.titleFontSize || 64);
+        setTitleFontWeight(data.titleFontWeight || 400);
+        setTitlePaddingTop(data.titlePaddingTop !== undefined ? data.titlePaddingTop : 48);
+        setTitlePaddingBottom(data.titlePaddingBottom !== undefined ? data.titlePaddingBottom : 48);
+        setTitleLineHeight(data.titleLineHeight || 1.1);
       }
     } catch (err) { console.error("Gagal memuat:", err); } 
     finally { setIsLoaded(true); }
@@ -778,12 +892,19 @@ export default function App() {
       { id: (Date.now() + 1).toString(), type: BLOCK_TYPES.ACTION, text: 'Terlihat layar menyala.' }
     ];
     const newTitle = "Naskah Baru";
+    
+    setTitleFont('roboto'); setTitleFontSize(64); setTitleFontWeight(400); 
+    setTitlePaddingTop(48); setTitlePaddingBottom(48); setTitleLineHeight(1.1);
+
     setBlocks(initialBlocks); setScriptTitle(newTitle); setCurrentScriptId(newId);
-    const newScriptData = { id: newId, folderId: currentFolderId, title: newTitle, blocks: initialBlocks, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const newScriptData = { 
+      id: newId, folderId: currentFolderId, title: newTitle, blocks: initialBlocks, 
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      titleFont: 'roboto', titleFontSize: 64, titleFontWeight: 400, titlePaddingTop: 48, titlePaddingBottom: 48, titleLineHeight: 1.1
+    };
 
     try {
       await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'scripts', newId), newScriptData);
-      setScriptsList(prev => [newScriptData, ...prev]);
     } catch (err) { console.error("Gagal:", err); } 
     finally { setIsLoaded(true); goToView('editor'); }
   };
@@ -793,12 +914,19 @@ export default function App() {
     setIsLoaded(false);
     clearHistory();
     const newId = `script_${Date.now()}`;
+    
+    setTitleFont('roboto'); setTitleFontSize(64); setTitleFontWeight(400); 
+    setTitlePaddingTop(48); setTitlePaddingBottom(48); setTitleLineHeight(1.1);
+
     setBlocks(initialBlocks); setScriptTitle(title); setCurrentScriptId(newId);
-    const newScriptData = { id: newId, folderId: currentFolderId, title: title, blocks: initialBlocks, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const newScriptData = { 
+      id: newId, folderId: currentFolderId, title: title, blocks: initialBlocks, 
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      titleFont: 'roboto', titleFontSize: 64, titleFontWeight: 400, titlePaddingTop: 48, titlePaddingBottom: 48, titleLineHeight: 1.1
+    };
 
     try {
       await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'scripts', newId), newScriptData);
-      setScriptsList(prev => [newScriptData, ...prev]);
     } catch (err) { console.error("Gagal import:", err); }
     finally { setIsLoaded(true); showToast("Naskah berhasil diimpor!"); goToView('editor'); }
   };
@@ -848,10 +976,8 @@ export default function App() {
           let orphanedScripts = [];
 
           if (foldersToDelete.length > 0) {
-            setFolders(prev => prev.filter(f => !foldersToDelete.includes(f.id)));
             for (const id of foldersToDelete) {
               await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'folders', id));
-              // Kumpulkan semua naskah di dalam folder ini agar ikut terhapus
               const scriptsInFolder = scriptsList.filter(s => s.folderId === id);
               scriptsInFolder.forEach(s => orphanedScripts.push(s.id));
             }
@@ -861,7 +987,6 @@ export default function App() {
           const allScriptsToDelete = [...new Set([...scriptsToDelete, ...orphanedScripts])];
 
           if (allScriptsToDelete.length > 0) {
-            setScriptsList(prev => prev.filter(s => !allScriptsToDelete.includes(s.id)));
             for (const id of allScriptsToDelete) {
               await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'scripts', id));
             }
@@ -896,40 +1021,19 @@ export default function App() {
     const itemsToDuplicate = scriptsList.filter(s => selectedItems.includes(s.id));
     if (itemsToDuplicate.length === 0) return;
 
-    const newItems = [];
     for (const item of itemsToDuplicate) {
       const newId = `script_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       const duplicatedData = { ...item, id: newId, title: `${item.title} (Copy)`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-      newItems.push(duplicatedData);
       try { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'scripts', newId), duplicatedData); } catch (err) {}
     }
-    setScriptsList(prev => [...newItems, ...prev]);
     setSelectedItems([]); setSelectionMode(false);
     showToast("Berhasil menduplikasi naskah.");
   };
 
   // Menggabungkan logika pemindahan item agar dapat digunakan ulang
-  const moveItemToFolder = async (itemId, targetFolderId) => {
-    const itemType = draggedItem?.type || 'script';
-    if (itemType === 'folder') return; // Folder tidak bisa dimasukkan ke folder
-
-    setScriptsList(prev => prev.map(s => s.id === itemId ? { ...s, folderId: targetFolderId, updatedAt: new Date().toISOString() } : s));
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'scripts', itemId), { folderId: targetFolderId, updatedAt: new Date().toISOString() }, { merge: true });
-    } catch(err) {}
-    showToast(targetFolderId ? "Naskah dipindahkan ke folder." : "Naskah dikembalikan ke Beranda.");
-  };
-
   const moveItemsToFolder = async (itemIds, targetFolderId) => {
     const scriptsToMove = itemIds.filter(id => scriptsList.some(s => s.id === id));
     if (scriptsToMove.length === 0) return;
-
-    setScriptsList(prev => prev.map(s => {
-      if (scriptsToMove.includes(s.id)) {
-        return { ...s, folderId: targetFolderId, updatedAt: new Date().toISOString() };
-      }
-      return s;
-    }));
     
     scriptsToMove.forEach(async (id) => {
       try {
@@ -941,35 +1045,24 @@ export default function App() {
   };
 
   const processDropAction = async (draggedData, targetId, targetType) => {
-    if (!draggedData || draggedData.items.includes(targetId)) return;
+    if (!draggedData || !draggedData.items || draggedData.items.includes(targetId)) return;
     const sourceItems = draggedData.items;
     const hasFolder = sourceItems.some(itemId => folders.some(f => f.id === itemId));
 
-    // 1. Drag Folder ke Script -> Masukkan Script ke dalam Folder
     if (hasFolder && targetType === 'script') {
       const folderId = sourceItems.find(itemId => folders.some(f => f.id === itemId));
-      if (folderId) {
-        await moveItemsToFolder([targetId], folderId);
-      }
+      if (folderId) await moveItemsToFolder([targetId], folderId);
     } 
-    // 2. Drag Script ke Folder -> Masukkan Script ke dalam Folder
     else if (!hasFolder && targetType === 'folder') {
       await moveItemsToFolder(sourceItems, targetId);
     } 
-    // 3. Drag Script ke Script -> Buat Folder Baru
     else if (!hasFolder && targetType === 'script') {
       if (currentFolderId !== null) return;
       const newFolderId = `folder_${Date.now()}`;
       const newFolder = { id: newFolderId, name: "Grup Baru", icon: "solid:Folder", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-      setFolders(prev => [newFolder, ...prev]);
 
       const scriptsToMove = sourceItems.filter(itemId => scriptsList.some(s => s.id === itemId));
       if (!scriptsToMove.includes(targetId)) scriptsToMove.push(targetId);
-
-      setScriptsList(prev => prev.map(s => { 
-        if (scriptsToMove.includes(s.id)) return { ...s, folderId: newFolderId, updatedAt: new Date().toISOString() }; 
-        return s; 
-      }));
 
       try { 
         await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'folders', newFolderId), newFolder); 
@@ -984,7 +1077,7 @@ export default function App() {
   };
 
   const processNavDrop = (draggedData, isHomeBtn) => {
-    if (!draggedData || draggedData.items.length === 0) return;
+    if (!draggedData || !draggedData.items || draggedData.items.length === 0) return;
     
     let targetFolderId = null;
     let nextView = 'home';
@@ -1045,12 +1138,11 @@ export default function App() {
       const targetId = dropTarget.getAttribute('data-id');
       const targetType = dropTarget.getAttribute('data-type');
       
-      // Implementasi fungsi canDrop
       let isDroppable = true;
-      if (draggedItem && draggedItem.items.includes(targetId)) isDroppable = false;
-      const hasFolder = draggedItem && draggedItem.items.some(itemId => folders.some(f => f.id === itemId));
+      if (draggedItem && draggedItem.items && draggedItem.items.includes(targetId)) isDroppable = false;
+      const hasFolder = draggedItem && draggedItem.items && draggedItem.items.some(itemId => folders.some(f => f.id === itemId));
       if (hasFolder && targetType === 'folder') isDroppable = false;
-      if (hasFolder && targetType === 'script' && draggedItem.items.length > 1) isDroppable = false;
+      if (hasFolder && targetType === 'script' && draggedItem && draggedItem.items && draggedItem.items.length > 1) isDroppable = false;
       if (!hasFolder && targetType === 'script' && currentFolderId !== null) isDroppable = false;
 
       if (isDroppable) {
@@ -1096,7 +1188,9 @@ export default function App() {
     }
 
     if (draggedItem && view === 'home' && dragOverTarget === null) {
-      moveItemsToFolder(draggedItem.items, null);
+      if(draggedItem.items && draggedItem.items.length > 0) {
+        moveItemsToFolder(draggedItem.items, null);
+      }
       if (draggedItem.isMulti) { setSelectedItems([]); setSelectionMode(false); }
     }
 
@@ -1120,10 +1214,10 @@ export default function App() {
     e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move';
     
     let isDroppable = true;
-    if (draggedItem && draggedItem.items.includes(targetId)) isDroppable = false;
-    const hasFolder = draggedItem && draggedItem.items.some(itemId => folders.some(f => f.id === itemId));
+    if (draggedItem && draggedItem.items && draggedItem.items.includes(targetId)) isDroppable = false;
+    const hasFolder = draggedItem && draggedItem.items && draggedItem.items.some(itemId => folders.some(f => f.id === itemId));
     if (hasFolder && targetType === 'folder') isDroppable = false;
-    if (hasFolder && targetType === 'script' && draggedItem.items.length > 1) isDroppable = false;
+    if (hasFolder && targetType === 'script' && draggedItem && draggedItem.items && draggedItem.items.length > 1) isDroppable = false;
     if (!hasFolder && targetType === 'script' && currentFolderId !== null) isDroppable = false;
 
     if (isDroppable) {
@@ -1169,7 +1263,7 @@ export default function App() {
     if (dragNavTimeout.current) { clearTimeout(dragNavTimeout.current); dragNavTimeout.current = null; }
   };
 
-  // --- AUTO-SAVE ---
+  // --- AUTO-SAVE DEBOUNCED ---
   useEffect(() => {
     if (view !== 'editor' || !user || !currentScriptId || blocks.length === 0 || !db) return;
     const saveToCloud = async () => {
@@ -1177,19 +1271,19 @@ export default function App() {
       const isoDate = new Date().toISOString();
       try {
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'scripts', currentScriptId);
-        await setDoc(docRef, { id: currentScriptId, title: scriptTitle, blocks, updatedAt: isoDate }, { merge: true });
+        await setDoc(docRef, { 
+          id: currentScriptId, 
+          title: scriptTitle, 
+          blocks, 
+          updatedAt: isoDate,
+          titleFont, titleFontSize, titleFontWeight, titlePaddingTop, titlePaddingBottom, titleLineHeight
+        }, { merge: true });
         setLastSaved(new Date());
-        setScriptsList(prev => {
-          const list = [...prev];
-          const idx = list.findIndex(s => s.id === currentScriptId);
-          if (idx !== -1) { list[idx].title = scriptTitle; list[idx].updatedAt = isoDate; }
-          return list;
-        });
       } catch (err) {} finally { setIsSaving(false); }
     };
-    const timeoutId = setTimeout(saveToCloud, 1000);
+    const timeoutId = setTimeout(saveToCloud, 1000); // 1 detik debounce
     return () => clearTimeout(timeoutId);
-  }, [blocks, scriptTitle, currentScriptId, user, view]);
+  }, [blocks, scriptTitle, currentScriptId, user, view, titleFont, titleFontSize, titleFontWeight, titlePaddingTop, titlePaddingBottom, titleLineHeight]);
 
   const updatePagination = useCallback(() => {}, []);
 
@@ -1398,12 +1492,15 @@ export default function App() {
   };
 
   const exportPDF = () => {
-    const fontFamily = selectedFont === 'fanwood' ? "'Fanwood Text', serif" : '"Courier New", Courier, monospace';
+    const fontFamily = selectedFont === 'fanwood' ? "'Fanwood Text', serif" : (selectedFont === 'roboto' ? "'Roboto', sans-serif" : '"Courier New", Courier, monospace');
+    const titleFontFamilyExport = titleFont === 'fanwood' ? "'Fanwood Text', serif" : (titleFont === 'roboto' ? "'Roboto', sans-serif" : '"Courier New", Courier, monospace');
+    
     let html = `<html><head><title>${scriptTitle}</title>
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fanwood+Text&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Fanwood+Text&family=Roboto:wght@100;300;400;500;700;900&display=swap');
         @page { size: letter; margin: 1in 1in 1in 1.5in; }
         body { font-family: ${fontFamily}; font-size: 12pt; line-height: 1.1; margin: 0; padding: 0; }
+        .script-title { font-family: ${titleFontFamilyExport}; font-size: ${titleFontSize}px; font-weight: ${titleFontWeight}; line-height: ${titleLineHeight}; text-align: center; padding-top: ${titlePaddingTop}px; padding-bottom: ${titlePaddingBottom}px; margin: 0; }
         .script-block { page-break-inside: avoid; }
         .scene { text-transform: uppercase; margin-top: 1.5em; margin-bottom: 1em; font-weight: bold; }
         .action { margin-top: 1em; margin-bottom: 1em; }
@@ -1411,7 +1508,9 @@ export default function App() {
         .dialogue { margin-bottom: 1em; margin-left: 1.5in; width: 3.5in; }
         .parenthetical { margin-left: 2in; width: 3in; margin-bottom: 0; }
         .transition { text-transform: uppercase; text-align: right; margin-top: 1.5em; margin-bottom: 1.5em; width: 100%; }
-      </style></head><body>`;
+      </style></head><body>
+      <div class="script-title">${escapeXml(scriptTitle).replace(/\n/g, '<br/>')}</div>
+      `;
     blocks.forEach(b => { html += `<div class="script-block ${b.type}">${escapeXml(b.text).replace(/\n/g, '<br/>')}</div>`; });
     html += `</body></html>`;
     
@@ -1423,7 +1522,7 @@ export default function App() {
   };
 
   const getBlockStyle = (type) => {
-    const fontClass = selectedFont === 'fanwood' ? 'font-fanwood' : 'font-mono';
+    const fontClass = selectedFont === 'fanwood' ? 'font-fanwood' : (selectedFont === 'roboto' ? 'font-roboto' : 'font-mono');
     const baseStyle = `block bg-transparent outline-none resize-none overflow-hidden ${fontClass} transition-none leading-relaxed text-[13px] sm:text-[14px] py-[2px] relative z-10 ${isDark ? 'text-[#E5E5EA] selection:bg-[#0A84FF]/40 placeholder-white/20' : 'text-gray-900 selection:bg-blue-300 placeholder-gray-400'}`;
     
     switch (type) {
@@ -1488,9 +1587,9 @@ export default function App() {
   const scriptItems = getSortedItems(currentScripts);
 
   return (
-    <div className={`min-h-screen pureref-bg overflow-x-hidden relative font-sans ${isDark ? 'dark text-white' : 'light text-gray-900'} w-full h-screen flex`}>
+    <div className={`min-h-screen pureref-bg overflow-x-hidden relative font-sans ${isDark ? 'dark text-white' : 'light text-gray-900'} w-full h-screen flex ${touchDragState.isDragging ? 'is-touch-dragging' : ''}`}>
 
-      {/* --- CUSTOM DRAG GHOST (TERSEMBUNYI) --- */}
+      {/* --- CUSTOM DRAG GHOST (Desktop HTML5 DnD) --- */}
       <div id="custom-drag-ghost" className="absolute top-[-10000px] left-[-10000px] bg-[#0A84FF] text-white px-4 py-2.5 rounded-xl flex items-center space-x-2 shadow-2xl font-sans font-medium text-sm border border-white/20" style={{ zIndex: -1 }}>
         <Move size={18} />
         <span id="drag-ghost-text" className="truncate max-w-[200px]">Memindahkan...</span>
@@ -1516,18 +1615,27 @@ export default function App() {
       )}
 
       {/* --- KONTAINER UTAMA --- */}
-      <div id="main-scroll-container" className={`relative h-full w-full ${isDark ? 'bg-[#121212]' : 'bg-[#FFFFFF]'} z-10 transition-all duration-300 ease-out overflow-y-auto overflow-x-hidden`}>
+      <div id="main-scroll-container" className="relative h-full w-full z-10 transition-all duration-300 ease-out overflow-y-scroll overflow-x-hidden flex flex-col">
         
         {/* --- HEADER TETAP --- */}
-        <header className={`sticky top-0 h-16 ${isDark ? 'bg-[#121212]/80 border-white/5' : 'bg-white/80 border-gray-100'} backdrop-blur-xl z-50 flex items-center justify-between px-4 sm:px-8 border-b`}>
+        <header className={`sticky top-0 h-16 ${isDark ? 'bg-[#121212]/80 border-white/5' : 'bg-white/80 border-gray-100'} backdrop-blur-xl z-50 flex items-center justify-between px-4 sm:px-8 border-b shrink-0`}>
           
           {/* KIRI HEADER (DENGAN DRAG TO NAVIGATE) */}
           <div className="flex-1 flex justify-start items-center">
             <button 
               id={view === 'home' ? "nav-home-btn" : "nav-back-btn"}
-              onClick={() => { 
-                if (view === 'editor') { goToView(currentFolderId ? 'folder' : 'home'); setBlocks([]); } 
-                else { goToView('home'); setCurrentFolderId(null); setSelectedItems([]); setSelectionMode(false); }
+              onClick={async () => { 
+                if (view === 'editor') { 
+                  await forceSaveScript(); // FORCE SAVE SEBELUM KELUAR
+                  goToView(currentFolderId ? 'folder' : 'home'); 
+                  setBlocks([]); 
+                } 
+                else { 
+                  goToView('home'); 
+                  setCurrentFolderId(null); 
+                  setSelectedItems([]); 
+                  setSelectionMode(false); 
+                }
               }} 
               onDragOver={(e) => handleDragOverNav(e, (view === 'editor' && currentFolderId) ? 'folder' : 'home')}
               onDragLeave={handleDragLeaveNav}
@@ -1569,21 +1677,38 @@ export default function App() {
 
                 {/* Pop-up Pengaturan Tampilan Animasi Mac */}
                 {isFontMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-[90]" onClick={(e) => { e.stopPropagation(); setIsFontMenuOpen(false); }}></div>
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 z-[100]" onClick={(e) => e.stopPropagation()}>
-                      <div className={`w-56 ${isDark ? 'bg-[#1C1C1E]/95 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'} backdrop-blur-[40px] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border flex flex-col p-1.5 origin-top animate-mac-popup`}>
-                        <div className={`px-3 py-2 text-[10px] font-semibold uppercase tracking-widest border-b ${isDark ? 'border-white/10 text-white/40' : 'border-gray-100 text-gray-400'} mb-1 text-center`}>Pengaturan Tampilan</div>
-                        <button onClick={() => { setSelectedFont('default'); setIsFontMenuOpen(false); }} className={`text-left px-4 py-2.5 text-sm rounded-xl transition-colors font-mono ${selectedFont === 'default' ? 'bg-[#0A84FF] text-white' : (isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100')}`}>Default (Mono)</button>
-                        <button onClick={() => { setSelectedFont('fanwood'); setIsFontMenuOpen(false); }} className={`text-left px-4 py-2.5 text-sm rounded-xl transition-colors ${selectedFont === 'fanwood' ? 'bg-[#0A84FF] text-white' : (isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100')}`} style={{ fontFamily: "'Fanwood Text', serif" }}>Fanwood Text</button>
-                        <div className={`my-1 border-b ${isDark ? 'border-white/10' : 'border-gray-100'}`}></div>
-                        <button onClick={() => { toggleTheme(); setIsFontMenuOpen(false); }} className={`text-left px-4 py-2.5 text-sm rounded-xl transition-colors flex items-center space-x-3 ${isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-900'}`}>
-                          {isDark ? <Sun size={16} className="text-[#FF9F0A]" /> : <Moon size={16} className="text-[#0A84FF]" />}
-                          <span>{isDark ? 'Mode Terang' : 'Mode Gelap'}</span>
-                        </button>
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 z-[100]">
+                    <div className={`w-72 sm:w-80 ${isDark ? 'bg-[#1C1C1E]/95 border-white/10 text-white' : 'bg-white/95 border-gray-200 text-gray-900'} backdrop-blur-[40px] rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border flex flex-col p-4 origin-top animate-mac-popup overscroll-none`}>
+                      
+                      <div className={`flex p-1 rounded-xl mb-4 ${isDark ? 'bg-black/50' : 'bg-gray-100'}`}>
+                        <button onClick={() => setSettingsTab('umum')} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${settingsTab === 'umum' ? (isDark ? 'bg-[#2C2C2E] text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm') : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}>Umum</button>
+                        <button onClick={() => setSettingsTab('judul')} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${settingsTab === 'judul' ? (isDark ? 'bg-[#2C2C2E] text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm') : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}>Gaya Judul</button>
                       </div>
+
+                      {settingsTab === 'umum' ? (
+                        <div className="animate-in fade-in duration-200">
+                          <div className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-gray-400'} mb-2`}>Tema Aplikasi</div>
+                          <div className="flex space-x-2 mb-4">
+                            <button onClick={() => { setIsDark(false); localStorage.setItem('naskah_theme', 'light'); }} className={`flex-1 py-2.5 rounded-xl text-xs flex items-center justify-center space-x-1.5 transition-colors font-medium ${!isDark ? 'bg-[#0A84FF] text-white shadow-md' : (isDark ? 'bg-white/5 hover:bg-white/10 text-white/70' : 'bg-gray-100 hover:bg-gray-200 text-gray-700')}`}><Sun size={14}/><span>Terang</span></button>
+                            <button onClick={() => { setIsDark(true); localStorage.setItem('naskah_theme', 'dark'); }} className={`flex-1 py-2.5 rounded-xl text-xs flex items-center justify-center space-x-1.5 transition-colors font-medium ${isDark ? 'bg-[#0A84FF] text-white shadow-md' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}><Moon size={14}/><span>Gelap</span></button>
+                          </div>
+
+                          <div className={`h-px w-full mb-3 ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}></div>
+                          <FontSelector selected={selectedFont} onSelect={setSelectedFont} title="Pilih Font Naskah" isDark={isDark} />
+                        </div>
+                      ) : (
+                        <div className="animate-in fade-in duration-200 space-y-2 max-h-[60vh] overflow-y-auto overscroll-none hide-scrollbar pr-1 -mr-1">
+                          <FontSelector selected={titleFont} onSelect={setTitleFont} title="Pilih Font Judul" isDark={isDark} />
+                          <div className={`h-px w-full mb-3 mt-1 ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}></div>
+                          <SliderControl label="Ukuran Teks" value={titleFontSize} min={16} max={300} onChange={setTitleFontSize} suffix="px" />
+                          <SliderControl label="Ketebalan (Weight)" value={titleFontWeight} min={100} max={900} step={100} onChange={setTitleFontWeight} />
+                          <SliderControl label="Jarak Atas (Pad Top)" value={titlePaddingTop} min={0} max={300} onChange={setTitlePaddingTop} suffix="px" />
+                          <SliderControl label="Jarak Bawah (Pad Bot)" value={titlePaddingBottom} min={0} max={300} onChange={setTitlePaddingBottom} suffix="px" />
+                          <SliderControl label="Spasi Antar Baris" value={titleLineHeight} min={0.8} max={2.5} step={0.1} onChange={setTitleLineHeight} />
+                        </div>
+                      )}
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             ) : view === 'folder' && currentFolderId ? (
@@ -1595,28 +1720,50 @@ export default function App() {
                   title="Ubah Ikon"
                 >
                   {editingFolderIcon && editingFolderIcon !== "" ? (
-                    <span className="text-sm"><SafeIcon iconStr={editingFolderIcon} /></span>
+                    <div className="w-4 h-4 flex items-center justify-center"><SafeIcon iconStr={editingFolderIcon} className="w-full h-full text-[#0A84FF]" /></div>
                   ) : (
                     <Folder size={14} className="text-[#0A84FF]" />
                   )}
                 </button>
 
                 {isEmojiPickerOpen && (
-                  <>
-                    <div className="fixed inset-0 z-[9998]" onClick={() => setIsEmojiPickerOpen(false)}></div>
-                    <div className={`absolute top-full left-0 sm:left-1/2 sm:-translate-x-1/2 mt-2 z-[9999]`}>
-                      <div className={`${isDark ? 'bg-[#1C1C1E]/95 border-white/10' : 'bg-white/95 border-gray-200'} backdrop-blur-[40px] border p-3 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] w-64 grid grid-cols-6 gap-2 origin-top animate-mac-popup`}>
-                         <button onClick={() => { handleUpdateFolder(currentFolderId, editingFolderName, ""); setIsEmojiPickerOpen(false); }} className={`w-8 h-8 flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-white/50 border-white/10' : 'hover:bg-gray-100 text-gray-500 border-gray-200'} rounded-lg transition-colors col-span-2 text-xs border`}>
-                            <Folder size={14} className="mr-1" /> Reset
-                         </button>
-                         {FOLDER_EMOJIS.map(emoji => (
-                           <button key={emoji} onClick={() => { handleUpdateFolder(currentFolderId, editingFolderName, emoji); setIsEmojiPickerOpen(false); }} className={`w-8 h-8 flex items-center justify-center ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-lg transition-colors text-lg active:scale-90`}>
-                             {emoji}
-                           </button>
-                         ))}
-                      </div>
+                  <div className={`absolute top-full left-0 sm:left-1/2 sm:-translate-x-1/2 mt-2 z-[9999]`}>
+                    <div className={`${isDark ? 'bg-[#1C1C1E]/95 border-white/10' : 'bg-white/95 border-gray-200'} backdrop-blur-[40px] border p-4 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] w-[340px] flex flex-col origin-top animate-mac-popup overscroll-none`}>
+                       <div className="flex justify-between items-center mb-3">
+                         <span className={`text-xs font-semibold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-gray-400'}`}>Pilih Ikon Folder</span>
+                         <button onClick={() => { handleUpdateFolder(currentFolderId, editingFolderName, "solid:Folder"); setIsEmojiPickerOpen(false); }} className={`text-xs font-bold ${isDark ? 'text-red-400 bg-red-500/10' : 'text-red-500 bg-red-50'} px-2 py-1 rounded-md hover:opacity-80 transition-colors`}>Reset</button>
+                       </div>
+                       
+                       <div className="max-h-64 overflow-y-auto overscroll-none custom-scrollbar pr-2 pb-2">
+                         <div className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/30' : 'text-gray-400'} mb-2 mt-1`}>Ikon Solid (Datar)</div>
+                         <div className="grid grid-cols-6 gap-2 mb-4 text-[#0A84FF]">
+                           {FOLDER_SOLID.map(solidStr => (
+                             <button key={solidStr} onClick={() => { handleUpdateFolder(currentFolderId, editingFolderName, solidStr); setIsEmojiPickerOpen(false); }} className={`w-10 h-10 flex items-center justify-center ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-xl transition-all hover:scale-110 active:scale-90`}>
+                               <div className="w-5 h-5 flex items-center justify-center"><SafeIcon iconStr={solidStr} /></div>
+                             </button>
+                           ))}
+                         </div>
+
+                         <div className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/30' : 'text-gray-400'} mb-2 mt-1`}>3D Animated & Statis</div>
+                         <div className="grid grid-cols-6 gap-2 mb-4">
+                           {ICONS_3D.map((obj, idx) => (
+                             <button key={`icon-${idx}`} onClick={() => { handleUpdateFolder(currentFolderId, editingFolderName, obj.anim); setIsEmojiPickerOpen(false); }} className={`w-10 h-10 flex items-center justify-center ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-xl transition-all hover:scale-110 active:scale-90`}>
+                               <div className="w-7 h-7 flex items-center justify-center"><SafeIcon iconStr={obj.anim} /></div>
+                             </button>
+                           ))}
+                         </div>
+
+                         <div className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/30' : 'text-gray-400'} mb-2 mt-1`}>Emoji Biasa</div>
+                         <div className="grid grid-cols-6 gap-2 mb-4">
+                           {FOLDER_EMOJIS.map((emoji, idx) => (
+                             <button key={`emoji-${idx}`} onClick={() => { handleUpdateFolder(currentFolderId, editingFolderName, emoji); setIsEmojiPickerOpen(false); }} className={`w-10 h-10 flex items-center justify-center ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'} rounded-xl transition-all hover:scale-110 active:scale-90 text-lg`}>
+                               {emoji}
+                             </button>
+                           ))}
+                         </div>
+                       </div>
                     </div>
-                  </>
+                  </div>
                 )}
 
                 <input
@@ -1650,14 +1797,11 @@ export default function App() {
                 
                 {/* Export Menu Pop-up Animasi Mac */}
                 {isExportMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsExportMenuOpen(false)}></div>
-                    <div className={`absolute right-0 mt-4 w-48 ${isDark ? 'bg-[#1C1C1E]/95 border-white/10' : 'bg-white/95 border-gray-200'} backdrop-blur-[40px] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border flex flex-col p-1.5 z-50 origin-top-right animate-mac-popup`}>
-                      <button onClick={() => exportPDF()} className={`text-left px-4 py-3 text-sm ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} rounded-xl transition-colors`}>Sebagai PDF</button>
-                      <button onClick={() => exportFDX()} className={`text-left px-4 py-3 text-sm ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} rounded-xl transition-colors`}>Final Draft (.fdx)</button>
-                      <button onClick={() => exportTXT()} className={`text-left px-4 py-3 text-sm ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} rounded-xl transition-colors`}>Plain Text (.txt)</button>
-                    </div>
-                  </>
+                  <div className={`absolute right-0 mt-4 w-48 ${isDark ? 'bg-[#1C1C1E]/95 border-white/10' : 'bg-white/95 border-gray-200'} backdrop-blur-[40px] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border flex flex-col p-1.5 z-50 origin-top-right animate-mac-popup`}>
+                    <button onClick={() => exportPDF()} className={`text-left px-4 py-3 text-sm ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} rounded-xl transition-colors`}>Sebagai PDF</button>
+                    <button onClick={() => exportFDX()} className={`text-left px-4 py-3 text-sm ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} rounded-xl transition-colors`}>Final Draft (.fdx)</button>
+                    <button onClick={() => exportTXT()} className={`text-left px-4 py-3 text-sm ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} rounded-xl transition-colors`}>Plain Text (.txt)</button>
+                  </div>
                 )}
               </div>
             ) : (
@@ -1676,48 +1820,45 @@ export default function App() {
 
                     {/* V.04 Menu Option Baru */}
                     {isOptionMenuOpen && (
-                      <>
-                        <div className="fixed inset-0 z-[90]" onClick={() => setIsOptionMenuOpen(false)}></div>
-                        <div className={`absolute right-0 top-full mt-4 w-60 ${isDark ? 'bg-[#1C1C1E]/95 border-white/10' : 'bg-white/95 border-gray-200'} backdrop-blur-[40px] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border flex flex-col p-2 z-[100] origin-top-right animate-mac-popup`}>
-                          
-                          {/* Akun */}
-                          <div className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-gray-400'}`}>Akun</div>
-                          <button onClick={() => { setIsOptionMenuOpen(false); setEditProfileNameInput(profileName); setEditProfileIconInput(profileIcon); setIsEditProfileModalOpen(true); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center space-x-3 transition-colors`}>
-                              <UserCog size={16} className={isDark ? 'text-white/60' : 'text-gray-500'} /> <span>Edit Profil</span>
-                          </button>
-                          <button onClick={() => { setIsOptionMenuOpen(false); requestLogout(); }} className={`w-full text-left px-3 py-2 rounded-xl text-red-500 ${isDark ? 'hover:bg-red-500/20' : 'hover:bg-red-50'} text-sm flex items-center space-x-3 transition-colors`}>
-                              <LogOut size={16} /> <span>Keluar</span>
-                          </button>
+                      <div className={`absolute right-0 top-full mt-4 w-60 ${isDark ? 'bg-[#1C1C1E]/95 border-white/10' : 'bg-white/95 border-gray-200'} backdrop-blur-[40px] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border flex flex-col p-2 z-[100] origin-top-right animate-mac-popup`}>
+                        
+                        {/* Akun */}
+                        <div className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-gray-400'}`}>Akun</div>
+                        <button onClick={() => { setIsOptionMenuOpen(false); setEditProfileNameInput(profileName); setEditProfileIconInput(profileIcon); setIsEditProfileModalOpen(true); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center space-x-3 transition-colors`}>
+                            <UserCog size={16} className={isDark ? 'text-white/60' : 'text-gray-500'} /> <span>Edit Profil</span>
+                        </button>
+                        <button onClick={() => { setIsOptionMenuOpen(false); requestLogout(); }} className={`w-full text-left px-3 py-2 rounded-xl text-red-500 ${isDark ? 'hover:bg-red-500/20' : 'hover:bg-red-50'} text-sm flex items-center space-x-3 transition-colors`}>
+                            <LogOut size={16} /> <span>Keluar</span>
+                        </button>
 
-                          <div className={`my-1 border-b ${isDark ? 'border-white/10' : 'border-gray-100'}`}></div>
+                        <div className={`my-1 border-b ${isDark ? 'border-white/10' : 'border-gray-100'}`}></div>
 
-                          {/* Tindakan File */}
-                          <div className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-gray-400'}`}>Tindakan File</div>
-                          <button onClick={() => { setIsOptionMenuOpen(false); openNewFolderModal(); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center space-x-3 transition-colors`}>
-                              <FolderPlus size={16} className={isDark ? 'text-[#0A84FF]' : 'text-blue-500'} /> <span>Folder Baru</span>
-                          </button>
-                          <button onClick={() => { setIsOptionMenuOpen(false); fileInputRef.current?.click(); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center space-x-3 transition-colors`}>
-                              <Upload size={16} className={isDark ? 'text-[#0A84FF]' : 'text-blue-500'} /> <span>Import Naskah</span>
-                          </button>
+                        {/* Tindakan File */}
+                        <div className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-gray-400'}`}>Tindakan File</div>
+                        <button onClick={() => { setIsOptionMenuOpen(false); openNewFolderModal(); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center space-x-3 transition-colors`}>
+                            <FolderPlus size={16} className={isDark ? 'text-[#0A84FF]' : 'text-blue-500'} /> <span>Folder Baru</span>
+                        </button>
+                        <button onClick={() => { setIsOptionMenuOpen(false); fileInputRef.current?.click(); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center space-x-3 transition-colors`}>
+                            <Upload size={16} className={isDark ? 'text-[#0A84FF]' : 'text-blue-500'} /> <span>Import Naskah</span>
+                        </button>
 
-                          <div className={`my-1 border-b ${isDark ? 'border-white/10' : 'border-gray-100'}`}></div>
+                        <div className={`my-1 border-b ${isDark ? 'border-white/10' : 'border-gray-100'}`}></div>
 
-                          {/* Urutkan File */}
-                          <div className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-gray-400'}`}>Urutkan File</div>
-                          <button onClick={() => { setIsOptionMenuOpen(false); setSortOrder('updatedDesc'); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center justify-between transition-colors`}>
-                              <div className="flex items-center space-x-3"><Clock size={16} className={isDark ? 'text-white/60' : 'text-gray-500'} /> <span>Terbaru Diubah</span></div>
-                              {sortOrder === 'updatedDesc' && <CheckCircle2 size={14} className="text-[#0A84FF]" />}
-                          </button>
-                          <button onClick={() => { setIsOptionMenuOpen(false); setSortOrder('createdDesc'); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center justify-between transition-colors`}>
-                              <div className="flex items-center space-x-3"><CalendarPlus size={16} className={isDark ? 'text-white/60' : 'text-gray-500'} /> <span>Baru Dibuat</span></div>
-                              {sortOrder === 'createdDesc' && <CheckCircle2 size={14} className="text-[#0A84FF]" />}
-                          </button>
-                          <button onClick={() => { setIsOptionMenuOpen(false); setSortOrder('nameAsc'); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center justify-between transition-colors`}>
-                              <div className="flex items-center space-x-3"><ListOrdered size={16} className={isDark ? 'text-white/60' : 'text-gray-500'} /> <span>Nama (A-Z)</span></div>
-                              {sortOrder === 'nameAsc' && <CheckCircle2 size={14} className="text-[#0A84FF]" />}
-                          </button>
-                        </div>
-                      </>
+                        {/* Urutkan File */}
+                        <div className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-gray-400'}`}>Urutkan File</div>
+                        <button onClick={() => { setIsOptionMenuOpen(false); setSortOrder('updatedDesc'); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center justify-between transition-colors`}>
+                            <div className="flex items-center space-x-3"><Clock size={16} className={isDark ? 'text-white/60' : 'text-gray-500'} /> <span>Terbaru Diubah</span></div>
+                            {sortOrder === 'updatedDesc' && <CheckCircle2 size={14} className="text-[#0A84FF]" />}
+                        </button>
+                        <button onClick={() => { setIsOptionMenuOpen(false); setSortOrder('createdDesc'); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center justify-between transition-colors`}>
+                            <div className="flex items-center space-x-3"><CalendarPlus size={16} className={isDark ? 'text-white/60' : 'text-gray-500'} /> <span>Baru Dibuat</span></div>
+                            {sortOrder === 'createdDesc' && <CheckCircle2 size={14} className="text-[#0A84FF]" />}
+                        </button>
+                        <button onClick={() => { setIsOptionMenuOpen(false); setSortOrder('nameAsc'); }} className={`w-full text-left px-3 py-2 rounded-xl ${isDark ? 'text-white hover:bg-white/10' : 'text-gray-900 hover:bg-gray-100'} text-sm flex items-center justify-between transition-colors`}>
+                            <div className="flex items-center space-x-3"><ListOrdered size={16} className={isDark ? 'text-white/60' : 'text-gray-500'} /> <span>Nama (A-Z)</span></div>
+                            {sortOrder === 'nameAsc' && <CheckCircle2 size={14} className="text-[#0A84FF]" />}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </>
@@ -1733,13 +1874,14 @@ export default function App() {
         </header>
 
         {/* --- AREA KONTEN UTAMA --- */}
-        <main 
-          className="pt-12 pb-12 px-4 sm:px-8 max-w-5xl mx-auto min-h-screen relative z-10 overflow-hidden"
+        <div 
+          className="flex-1 w-full relative z-10 pt-8 pb-12 px-4 sm:px-8 max-w-5xl mx-auto"
           onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
           onDrop={(e) => { 
             e.preventDefault(); 
-            if (draggedItem && draggedItem.type === 'script' && view === 'home') {
-              moveItemToFolder(draggedItem.id, null);
+            if (draggedItem && draggedItem.items && draggedItem.items.length > 0 && view === 'home') {
+              moveItemsToFolder(draggedItem.items, null);
+              if (draggedItem.isMulti) { setSelectedItems([]); setSelectionMode(false); }
             }
             setDragOverTarget(null); 
             setDraggedItem(null); 
@@ -1766,7 +1908,7 @@ export default function App() {
                     data-droppable="true"
                     data-id={f.id}
                     data-type="folder"
-                    draggable={!selectionMode}
+                    draggable={true}
                     onDragStart={(e) => handleDragStart(e, f.id, 'folder', f.name)}
                     onDragOver={(e) => handleDragOver(e, f.id, 'folder')}
                     onDragLeave={handleDragLeave}
@@ -1807,7 +1949,7 @@ export default function App() {
                     data-droppable="true"
                     data-id={s.id}
                     data-type="script"
-                    draggable={!selectionMode}
+                    draggable={true}
                     onDragStart={(e) => handleDragStart(e, s.id, 'script', s.title)}
                     onDragOver={(e) => handleDragOver(e, s.id, 'script')}
                     onDragLeave={handleDragLeave}
@@ -1871,7 +2013,7 @@ export default function App() {
                     data-droppable="true"
                     data-id={s.id}
                     data-type="script"
-                    draggable={!selectionMode}
+                    draggable={true}
                     onDragStart={(e) => handleDragStart(e, s.id, 'script', s.title)}
                     onDragOver={(e) => handleDragOver(e, s.id, 'script')}
                     onDragLeave={handleDragLeave}
@@ -1916,79 +2058,88 @@ export default function App() {
 
           {/* VIEW 3: EDITOR (MENGEDIT NASKAH) */}
           {view === 'editor' && (
-            <div className={`max-w-[680px] mx-auto relative z-10 ${getAnimationClass()}`}>
+            <div className={`w-full relative z-10 ${getAnimationClass()}`}>
               
-              <div className="mb-8 pl-1 sm:pl-4 group/title cursor-text relative flex items-start">
-                 <FileEdit size={14} className={`${isDark ? 'text-white/30' : 'text-gray-400'} absolute -left-4 top-3 sm:top-4 opacity-0 group-hover/title:opacity-100 transition-opacity mt-1`} />
+              {/* --- AREA JUDUL FULL WINDOW (V.07) --- */}
+              <div 
+                className="group/title cursor-text relative flex justify-center items-center w-full mx-auto"
+                style={{ paddingTop: `${titlePaddingTop}px`, paddingBottom: `${titlePaddingBottom}px` }}
+              >
+                 <FileEdit size={24} className={`${isDark ? 'text-white/20' : 'text-gray-300'} absolute left-4 sm:left-8 opacity-0 group-hover/title:opacity-100 transition-opacity z-20`} />
                  <AutoResizeTextarea 
                    value={scriptTitle} 
                    onChange={(e) => setScriptTitle(e.target.value.replace(/[\r\n]+/g, ' '))}
                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }}
-                   className={`bg-transparent border-none outline-none font-bold tracking-widest text-2xl sm:text-3xl w-full transition-colors uppercase resize-none overflow-hidden block break-words leading-tight sm:leading-snug script-title-text ${isDark ? 'text-white/40 hover:text-white/70 focus:text-white placeholder-white/20' : 'text-gray-400 hover:text-gray-700 focus:text-gray-900 placeholder-gray-300'}`}
+                   className={`bg-transparent border-none outline-none tracking-tight w-full px-4 sm:px-12 transition-colors resize-none overflow-hidden block break-words text-center ${titleFont === 'fanwood' ? 'font-fanwood' : titleFont === 'roboto' ? 'font-roboto' : 'font-mono'} ${isDark ? 'text-white hover:text-white/90 focus:text-white placeholder-white/20' : 'text-gray-900 hover:text-gray-800 focus:text-gray-900 placeholder-gray-300'}`}
+                   style={{ fontSize: `${titleFontSize}px`, fontWeight: titleFontWeight, lineHeight: titleLineHeight }}
                    placeholder="JUDUL NASKAH..."
                  />
               </div>
 
-              <div id="script-editor-container" className={`w-full relative ${isDark ? 'bg-white/[0.02] border-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.6)]' : 'bg-white border-gray-200 shadow-xl'} backdrop-blur-[60px] border rounded-[2rem] px-8 sm:px-12 md:px-[96px] pt-[96px] pb-[96px] transition-all min-h-[1056px]`}>
-                
-                <div className={`absolute top-0 bottom-0 left-[5px] right-[5px] pointer-events-none ${isDark ? 'page-break-lines-dark' : 'page-break-lines-light'} z-0 rounded-[1.8rem] overflow-hidden`}></div>
+              {/* --- AREA CANVAS TERBATAS (KERTAS NASKAH) --- */}
+              <div className="max-w-[680px] mx-auto w-full">
+                <div id="script-editor-container" className={`w-full relative ${isDark ? 'bg-[#1C1C1E] border border-white/5 shadow-[0_8px_40px_rgba(0,0,0,0.6)]' : 'bg-white border border-gray-200 shadow-xl'} backdrop-blur-[60px] rounded-[2rem] px-8 sm:px-12 md:px-[96px] pt-[96px] pb-[96px] transition-all min-h-[1056px]`}>
+                  
+                  <div className={`absolute top-0 bottom-0 left-[5px] right-[5px] pointer-events-none ${isDark ? 'page-break-lines-dark' : 'page-break-lines-light'} z-0 rounded-[1.8rem] overflow-hidden`}></div>
 
-                <div className="w-full mx-auto space-y-0 relative group/editor z-10">
-                  {blocks.map((block, index) => (
-                    <div key={block.id} className="relative group w-full flex flex-col script-block-container transition-all duration-300" onFocus={() => setActiveBlockId(block.id)}>
-                      
-                      <div className={`absolute -left-12 sm:-left-16 top-1.5 flex items-center justify-center px-2 py-1 rounded-md transition-all duration-300 ${activeBlockId === block.id ? `opacity-100 scale-100 ${isDark ? 'bg-white/5 border border-white/10 shadow-[0_0_10px_rgba(255,255,255,0.05)]' : 'bg-gray-100 border border-gray-200 shadow-sm'}` : 'opacity-0 scale-95 group-hover:opacity-40'}`}>
-                        {getFormatText(block.type)}
+                  <div className="w-full mx-auto space-y-0 relative group/editor z-10">
+                    {blocks.map((block, index) => (
+                      <div key={block.id} className="relative group w-full flex flex-col script-block-container transition-all duration-300" onFocus={() => setActiveBlockId(block.id)}>
+                        
+                        <div className={`absolute -left-12 sm:-left-16 top-1.5 flex items-center justify-center px-2 py-1 rounded-md transition-all duration-300 ${activeBlockId === block.id ? `opacity-100 scale-100 ${isDark ? 'bg-white/5 border border-white/10 shadow-[0_0_10px_rgba(255,255,255,0.05)]' : 'bg-gray-100 border border-gray-200 shadow-sm'}` : 'opacity-0 scale-95 group-hover:opacity-40'}`}>
+                          {getFormatText(block.type)}
+                        </div>
+
+                        <div className="w-full relative flex flex-col">
+                          <AutoResizeTextarea
+                            value={block.text}
+                            className={getBlockStyle(block.type)}
+                            placeholder={block.type === BLOCK_TYPES.SCENE ? "INT. LOKASI - WAKTU" : "Ketik di sini..."}
+                            onChange={(e) => handleInput(e, block.id, block.type)}
+                            onKeyDown={(e) => handleKeyDown(e, index)}
+                            onFocus={() => {
+                              setActiveBlockId(block.id);
+                              if (suggestionTargetId !== block.id) { setActiveSuggestions([]); setSuggestionTargetId(null); }
+                            }}
+                            onSelect={(e) => {
+                              selectionRef.current = { id: block.id, start: e.target.selectionStart, end: e.target.selectionEnd };
+                            }}
+                            ref={(el) => blockRefs.current[block.id] = el}
+                          />
+
+                          {/* Autocomplete Menu Pop-up Animasi Mac */}
+                          {suggestionTargetId === block.id && activeSuggestions.length > 0 && (
+                            <div 
+                              className={`absolute z-50 ${isDark ? 'bg-[#1C1C1E]/90 border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.7)]' : 'bg-white border-gray-200 shadow-2xl'} backdrop-blur-[50px] border rounded-2xl mt-2 overflow-hidden p-1 origin-top animate-mac-popup`}
+                              style={{ top: '100%', left: block.type === BLOCK_TYPES.CHARACTER ? '25%' : '0', width: block.type === BLOCK_TYPES.CHARACTER ? '50%' : '100%', maxWidth: '400px' }}
+                            >
+                              <ul className="max-h-48 overflow-y-auto py-1 custom-scrollbar">
+                                {activeSuggestions.map((sug, i) => (
+                                  <li key={i} onMouseDown={(e) => { e.preventDefault(); applySuggestion(sug, block, index); }}
+                                    className={`px-4 py-2.5 text-sm cursor-pointer font-mono rounded-xl transition-colors ${i === suggestionIndex ? 'bg-[#0A84FF] text-white' : (isDark ? 'text-white/80 hover:bg-white/10' : 'text-gray-700 hover:bg-gray-100')}`}
+                                  >
+                                    {sug}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
                       </div>
-
-                      <div className="w-full relative flex flex-col">
-                        <AutoResizeTextarea
-                          value={block.text}
-                          className={getBlockStyle(block.type)}
-                          placeholder={block.type === BLOCK_TYPES.SCENE ? "INT. LOKASI - WAKTU" : "Ketik di sini..."}
-                          onChange={(e) => handleInput(e, block.id, block.type)}
-                          onKeyDown={(e) => handleKeyDown(e, index)}
-                          onFocus={() => {
-                            setActiveBlockId(block.id);
-                            if (suggestionTargetId !== block.id) { setActiveSuggestions([]); setSuggestionTargetId(null); }
-                          }}
-                          onSelect={(e) => {
-                            selectionRef.current = { id: block.id, start: e.target.selectionStart, end: e.target.selectionEnd };
-                          }}
-                          ref={(el) => blockRefs.current[block.id] = el}
-                        />
-
-                        {/* Autocomplete Menu Pop-up Animasi Mac */}
-                        {suggestionTargetId === block.id && activeSuggestions.length > 0 && (
-                          <div 
-                            className={`absolute z-50 ${isDark ? 'bg-[#1C1C1E]/90 border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.7)]' : 'bg-white border-gray-200 shadow-2xl'} backdrop-blur-[50px] border rounded-2xl mt-2 overflow-hidden p-1 origin-top animate-mac-popup`}
-                            style={{ top: '100%', left: block.type === BLOCK_TYPES.CHARACTER ? '25%' : '0', width: block.type === BLOCK_TYPES.CHARACTER ? '50%' : '100%', maxWidth: '400px' }}
-                          >
-                            <ul className="max-h-48 overflow-y-auto py-1 custom-scrollbar">
-                              {activeSuggestions.map((sug, i) => (
-                                <li key={i} onMouseDown={(e) => { e.preventDefault(); applySuggestion(sug, block, index); }}
-                                  className={`px-4 py-2.5 text-sm cursor-pointer font-mono rounded-xl transition-colors ${i === suggestionIndex ? 'bg-[#0A84FF] text-white' : (isDark ? 'text-white/80 hover:bg-white/10' : 'text-gray-700 hover:bg-gray-100')}`}
-                                >
-                                  {sug}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
+
             </div>
           )}
 
-        </main>
+        </div>
       </div>
 
       {/* --- MODAL POP-UPS GLOBAL --- */}
       
-      {/* Edit Profile Modal (V.04) dengan Pemilihan Ikon 3D Animasi */}
+      {/* Edit Profile Modal */}
       {isEditProfileModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setIsEditProfileModalOpen(false)}></div>
@@ -2006,17 +2157,38 @@ export default function App() {
             </div>
             
             <div className="mb-6">
-               <label className={`block text-xs uppercase tracking-widest font-semibold mb-2 ${isDark ? 'text-white/40' : 'text-gray-400'}`}>Pilih Ikon (3D Animated Style)</label>
-               <div className="grid grid-cols-4 gap-2">
-                 {PROFILE_ICONS_3D.map((iconUrl, idx) => (
-                   <div 
-                     key={idx} 
-                     onClick={() => setEditProfileIconInput(iconUrl)}
-                     className={`cursor-pointer rounded-xl p-2 flex items-center justify-center transition-all ${editProfileIconInput === iconUrl ? 'bg-[#0A84FF]/20 ring-2 ring-[#0A84FF]' : (isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200')}`}
-                   >
-                     <img src={iconUrl} alt="3D Icon" className="w-10 h-10 object-contain drop-shadow-md hover:scale-110 transition-transform duration-200" />
-                   </div>
-                 ))}
+               <div className="flex flex-col max-h-72 overflow-y-auto custom-scrollbar pr-2 pb-2 overscroll-none">
+                 
+                 {/* Ikon Datar (Solid Vector) */}
+                 <label className={`block text-xs uppercase tracking-widest font-semibold mb-2 mt-1 ${isDark ? 'text-white/40' : 'text-gray-400'}`}>Ikon Solid (Datar)</label>
+                 <div className="grid grid-cols-6 gap-2 mb-4 text-[#0A84FF]">
+                   {PROFILE_SOLID.map(solidStr => (
+                     <div 
+                       key={solidStr} 
+                       onClick={() => setEditProfileIconInput(solidStr)}
+                       className={`cursor-pointer rounded-xl w-10 h-10 flex items-center justify-center transition-all ${editProfileIconInput === solidStr ? 'bg-[#0A84FF]/20 ring-2 ring-[#0A84FF]' : (isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200')}`}
+                     >
+                       <div className="w-5 h-5 flex items-center justify-center hover:scale-110 transition-transform duration-200">
+                         <SafeIcon iconStr={solidStr} />
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+
+                 {/* Ikon 3D dan Emoji */}
+                 <label className={`block text-xs uppercase tracking-widest font-semibold mb-2 mt-1 ${isDark ? 'text-white/40' : 'text-gray-400'}`}>3D Animated Style</label>
+                 <div className="grid grid-cols-6 gap-2 mb-4">
+                   {PROFILE_ICONS_3D.map((iconUrl, idx) => (
+                     <div 
+                       key={idx} 
+                       onClick={() => setEditProfileIconInput(iconUrl)}
+                       className={`cursor-pointer rounded-xl w-10 h-10 flex items-center justify-center transition-all ${editProfileIconInput === iconUrl ? 'bg-[#0A84FF]/20 ring-2 ring-[#0A84FF]' : (isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200')}`}
+                     >
+                       <img src={iconUrl} alt="3D Icon" className="w-7 h-7 object-contain drop-shadow-md hover:scale-110 transition-transform duration-200" />
+                     </div>
+                   ))}
+                 </div>
+
                </div>
             </div>
 
@@ -2189,7 +2361,6 @@ export default function App() {
 
         .font-fanwood {
           font-family: 'Fanwood Text', serif;
-          font-size: 15px !important;
         }
 
         .mymind-grid {
