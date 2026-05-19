@@ -1899,7 +1899,7 @@ export default function App() {
                   <div className={`w-12 h-12 rounded-full ${isDark ? 'bg-white/5' : 'bg-gray-100'} group-hover:bg-[#0A84FF] flex items-center justify-center transition-colors mb-3`}>
                     <Plus size={24} className={`${isDark ? 'text-white/50' : 'text-gray-400'} group-hover:text-white transition-colors`} />
                   </div>
-                  <span className={`text-sm font-medium ${isDark ? 'text-white/50' : 'text-gray-500'} group-hover:text-[#0A84FF] transition-colors`}>Naskah Baru</span>
+                  <span className={`text-sm font-medium ${isDark ? 'text-white/50' : 'text-gray-500'} group-hover:text-[#0A84FF] transition-colors`}>+ Click Here</span>
                 </div>
 
                 {folderItems.map(f => (
@@ -1996,7 +1996,7 @@ export default function App() {
                     <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${isDark ? 'bg-white/5' : 'bg-gray-100'} group-hover:bg-[#0A84FF] flex items-center justify-center transition-colors mb-2 sm:mb-3`}>
                       <Plus size={20} className={`${isDark ? 'text-white/50' : 'text-gray-400'} group-hover:text-white transition-colors sm:w-6 sm:h-6`} />
                     </div>
-                    <span className={`text-xs sm:text-sm font-medium ${isDark ? 'text-white/50' : 'text-gray-500'} group-hover:text-[#0A84FF] transition-colors`}>Naskah Baru</span>
+                    <span className={`text-xs sm:text-sm font-medium ${isDark ? 'text-white/50' : 'text-gray-500'} group-hover:text-[#0A84FF] transition-colors`}>+ Click Here</span>
                   </div>
 
                   <div onClick={() => fileInputRef.current?.click()} className={`group ${isDark ? 'bg-[#1A1A1C] border-white/10 hover:border-[#0A84FF]/50' : 'bg-white border-gray-200 hover:border-[#0A84FF]/50 shadow-sm'} border-dashed rounded-[1.5rem] p-6 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 active:scale-[0.98]`}>
